@@ -49,10 +49,10 @@ cd lib/jamsdk.c3l && git pull
 
 - [Docker](https://www.docker.com/) (linux/amd64 — uses x86_64 toolchain)
 
-### Build the Docker Image
+### Pull the Docker Image
 
 ```bash
-docker build --platform=linux/amd64 -t jamsdk .
+docker pull ghcr.io/dreverr/jamsdk:latest
 ```
 
 ### Build a Service
@@ -60,7 +60,7 @@ docker build --platform=linux/amd64 -t jamsdk .
 ```bash
 docker run --rm --platform=linux/amd64 \
   -v ./my-service:/work \
-  jamsdk my_service.c3
+  ghcr.io/dreverr/jamsdk my_service.c3
 ```
 
 Output: `build/my_service.jam`
@@ -70,7 +70,7 @@ Output: `build/my_service.jam`
 ```bash
 docker run --rm --platform=linux/amd64 \
   -v ./my-auth:/work \
-  jamsdk --authorizer my_auth.c3
+  ghcr.io/dreverr/jamsdk --authorizer my_auth.c3
 ```
 
 ## Writing a Service

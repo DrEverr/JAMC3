@@ -28,11 +28,11 @@ set -euo pipefail
 
 # ---- Defaults ----
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SDK_DIR="${SCRIPT_DIR}/../jamsdk.c3l"
+SDK_DIR="${SCRIPT_DIR}/../jamc3.c3l"
 
-# In Docker the SDK lives at /opt/jamsdk/jamsdk.c3l.
-if ! ls "${SDK_DIR}"/*.c3 &>/dev/null && [[ -d "/opt/jamsdk/jamsdk.c3l" ]]; then
-    SDK_DIR="/opt/jamsdk/jamsdk.c3l"
+# In Docker the SDK lives at /opt/jamc3/jamc3.c3l.
+if ! ls "${SDK_DIR}"/*.c3 &>/dev/null && [[ -d "/opt/jamc3/jamc3.c3l" ]]; then
+    SDK_DIR="/opt/jamc3/jamc3.c3l"
 fi
 
 OUTPUT=""

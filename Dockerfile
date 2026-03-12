@@ -49,12 +49,12 @@ COPY --from=builder /opt/bin/polkavm-to-jam /usr/local/bin/polkavm-to-jam
 ENV PATH="/opt/c3:${PATH}"
 
 # Copy SDK library (including host_stubs.c) and build script
-COPY jamsdk.c3l/ /opt/jamsdk/jamsdk.c3l/
-COPY scripts/    /opt/jamsdk/scripts/
+COPY jamc3.c3l/ /opt/jamc3/jamc3.c3l/
+COPY scripts/    /opt/jamc3/scripts/
 
 # Make jam-build available on PATH
-RUN chmod +x /opt/jamsdk/scripts/jam-build \
-    && ln -s /opt/jamsdk/scripts/jam-build /usr/local/bin/jam-build
+RUN chmod +x /opt/jamc3/scripts/jam-build \
+    && ln -s /opt/jamc3/scripts/jam-build /usr/local/bin/jam-build
 
 WORKDIR /app
 

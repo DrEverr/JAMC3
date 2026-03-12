@@ -20,7 +20,7 @@ Add the SDK as a C3 library dependency — your editor/LSP will provide full aut
 
 ```bash
 mkdir -p lib
-git clone https://github.com/DrEverr/jamsdk.c3l.git lib/jamsdk.c3l
+git clone https://github.com/DrEverr/jamc3.c3l.git lib/jamc3.c3l
 ```
 
 Then in your `project.json`:
@@ -28,7 +28,7 @@ Then in your `project.json`:
 ```json
 {
   "dependency-search-paths": ["lib"],
-  "dependencies": ["jamsdk"],
+  "dependencies": ["jamc3"],
   "sources": ["src/**"],
   "use-stdlib": false,
   "link-libc": false
@@ -40,7 +40,7 @@ You can now `import jam::types`, `import jam::service`, etc. with full IDE sugge
 To update the SDK later:
 
 ```bash
-cd lib/jamsdk.c3l && git pull
+cd lib/jamc3.c3l && git pull
 ```
 
 ## Quick Start
@@ -52,13 +52,13 @@ cd lib/jamsdk.c3l && git pull
 ### Pull the Docker Image
 
 ```bash
-docker pull ghcr.io/dreverr/jamsdk:latest
+docker pull ghcr.io/dreverr/jamc3:latest
 ```
 
 or (on MacOS)
 
 ```bash
-docker pull --platform=linux/amd64 ghcr.io/dreverr/jamsdk:latest
+docker pull --platform=linux/amd64 ghcr.io/dreverr/jamc3:latest
 ```
 
 ### Build a Service
@@ -66,7 +66,7 @@ docker pull --platform=linux/amd64 ghcr.io/dreverr/jamsdk:latest
 ```bash
 docker run --rm --platform=linux/amd64 \
   -v ./my-service:/app \
-  ghcr.io/dreverr/jamsdk my_service.c3
+  ghcr.io/dreverr/jamc3 my_service.c3
 ```
 
 Output: `build/my_service.jam`
@@ -76,7 +76,7 @@ Output: `build/my_service.jam`
 ```bash
 docker run --rm --platform=linux/amd64 \
   -v ./my-auth:/app \
-  ghcr.io/dreverr/jamsdk --authorizer my_auth.c3
+  ghcr.io/dreverr/jamc3 --authorizer my_auth.c3
 ```
 
 ## Writing a Service
@@ -175,7 +175,7 @@ Build with `--authorizer` flag.
 jam-build [options] <source.c3> [additional sources...]
 
 Options:
-  --sdk-dir <path>     Path to SDK jamsdk.c3l/ directory (default: auto-detect)
+  --sdk-dir <path>     Path to SDK jamc3.c3l/ directory (default: auto-detect)
   --output|-o <path>   Output .jam file path (default: build/<name>.jam)
   --authorizer         Build as authorizer instead of service
   --keep-intermediates Keep .elf and .polkavm files next to output
@@ -194,7 +194,7 @@ The `jam-build` script runs a 5-step pipeline:
 ## Project Structure
 
 ```
-jamsdk.c3l/               SDK library (git submodule -> github.com/aspect-build/jamsdk.c3l)
+jamc3.c3l/                SDK library (git submodule -> github.com/DrEverr/jamc3.c3l)
   manifest.json           C3 library manifest
   types.c3                JAM protocol types
   codec.c3                Binary encoding/decoding

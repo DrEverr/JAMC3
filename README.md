@@ -55,6 +55,12 @@ cd lib/jamsdk.c3l && git pull
 docker pull ghcr.io/dreverr/jamsdk:latest
 ```
 
+or (on MacOS)
+
+```bash
+docker pull --platform=linux/amd64 ghcr.io/dreverr/jamsdk:latest
+```
+
 ### Build a Service
 
 ```bash

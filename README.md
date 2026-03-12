@@ -1,4 +1,4 @@
-# JAM SDK for C3
+# JAMC3 (pronounced "jamsy") JAM SDK for C3
 
 A complete SDK for writing [JAM](https://graypaper.com/) blockchain services in the [C3 programming language](https://c3-lang.org/).
 

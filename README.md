@@ -135,7 +135,7 @@ fn void accumulate(types::AccumulateArgs* args) @export("accumulate")
     if (catch codec::encode_u64(&out, 8, counter)) { return; }
     if (catch storage::kv_write(&key, 4, &out, 8)) { return; }
 
-    log::info_u64("svc", "counter", counter);
+    log::debug_u64("svc", "counter", counter);
 }
 ```
 

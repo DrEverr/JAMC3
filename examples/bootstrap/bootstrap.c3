@@ -65,10 +65,10 @@ const char OP_STORE           = 0x04;
 // Refine: pass-through
 // ============================================================================
 
-fn void refine(types::RefineArgs* args) @export("refine")
+fn types::RefineResult refine(types::RefineArgs* args) @export("refine")
 {
     log::info("boot", "Bootstrap refine");
-    service::return_to_host(args.work_payload, (usz)args.work_payload_len);
+    return service::refine_ok(args.work_payload, (usz)args.work_payload_len);
 }
 
 // ============================================================================

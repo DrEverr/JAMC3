@@ -13,14 +13,14 @@ import jam::log;
 // Receives a work payload containing a number, doubles it, returns result.
 // ---------------------------------------------------------------------------
 
-fn void refine(types::RefineArgs* args) @export("refine")
+fn types::RefineResult refine(types::RefineArgs* args) @export("refine")
 {
     log::info("storage", "Refine: processing work item");
 
     if (args.work_payload == null || args.work_payload_len == 0)
     {
         log::warn("storage", "Refine: empty payload");
-        return;
+        return service::refine_empty();
     }
 
     codec::DecodeCtx ctx = codec::decode_ctx_init(args.work_payload, args.work_payload_len);
@@ -30,7 +30,7 @@ fn void refine(types::RefineArgs* args) @export("refine")
     if (catch decoded)
     {
         log::err("storage", "Refine: failed to decode payload");
-        return;
+        return service::refine_empty();
     }
     value = decoded;
 
@@ -39,10 +39,10 @@ fn void refine(types::RefineArgs* args) @export("refine")
     if (catch codec::encode_u64(&out_buf, 8, result))
     {
         log::err("storage", "Refine: failed to encode result");
-        return;
+        return service::refine_empty();
     }
     log::debug_u64("storage", "Refine: result", result);
-    service::return_to_host(&out_buf, 8);
+    return service::refine_ok(&out_buf, 8);
 }
 
 // ---------------------------------------------------------------------------

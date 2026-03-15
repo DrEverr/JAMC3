@@ -6,7 +6,7 @@ import jam::log;
 import jam::service;
 import jam::types;
 
-fn void refine(types::RefineArgs* args) @export("refine") {
+fn types::RefineResult refine(types::RefineArgs* args) @export("refine") {
   log::debug_u64("fib", "Refine: entry, service: ", args.service_id);
 
   ulong value = 10;
@@ -28,8 +28,8 @@ fn void refine(types::RefineArgs* args) @export("refine") {
   log::debug_u64("fib", "Refine: result ", result);
 
   char[8] buf;
-  if (catch codec::encode_u64(&buf, 8, result)) {return;}
-  service::return_to_host(&buf, 8);
+  if (catch codec::encode_u64(&buf, 8, result)) { return service::refine_empty(); }
+  return service::refine_ok(&buf, 8);
 }
 
 fn void accumulate(types::AccumulateArgs* args) @export("accumulate") {}

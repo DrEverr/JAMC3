@@ -23,7 +23,7 @@ mkdir -p lib
 git clone https://github.com/DrEverr/jamc3.c3l.git lib/jamc3.c3l
 ```
 
-Then in your `project.json`:
+Then create/update your `project.json`:
 
 ```json
 {

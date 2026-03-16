@@ -87,12 +87,12 @@ import jam::types;
 import jam::service;
 import jam::log;
 
-fn void refine(types::RefineArgs* args) @export("refine")
+fn types::RefineResult refine(types::RefineArgs* args) @export("refine")
 {
     log::info("svc", "Hello from refine!");
 
     char[5] result = { 'h', 'e', 'l', 'l', 'o' };
-    service::return_to_host(&result, 5);
+    return service::refine_ok(&result, 5);
 }
 
 fn void accumulate(types::AccumulateArgs* args) @export("accumulate")
@@ -207,10 +207,7 @@ scripts/
   jam-build               Build script
 tools/
   polkavm-to-jam/         Patched polkavm-to-jam converter
-examples/
-  hello-world/            Minimal service
-  storage-demo/           KV storage counter service
-  simple-auth/            Minimal authorizer
+examples/                 Multiple source code examples of utilizing jamC3
 ```
 
 ## Requirements

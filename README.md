@@ -29,9 +29,6 @@ Then in your `project.json`:
 {
   "dependency-search-paths": ["lib"],
   "dependencies": ["jamc3"],
-  "sources": ["src/**"],
-  "use-stdlib": false,
-  "link-libc": false
 }
 ```
 

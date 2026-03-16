@@ -14,7 +14,7 @@ Compiles C3 source code into `.jam` blobs that run on PolkaVM — the virtual ma
 - Bare metal — no standard library, no libc
 - Docker-based build tool that produces `.jam` files in one command
 
-## Using the SDK in Your Project
+## Using the SDK in Your Project (optional - Docker image has build in library)
 
 Add the SDK as a C3 library dependency — your editor/LSP will provide full autocompletion for all `jam::` modules.
 

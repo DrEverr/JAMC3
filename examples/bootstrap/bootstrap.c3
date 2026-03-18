@@ -337,11 +337,7 @@ fn usz do_upgrade(char* data, usz pos, usz len)
     ulong min_memo_gas = read_u64_le(data, pos); pos += 8;
 
     log::info("boot", "Upgrade");
-    if (catch err = service::upgrade(&code_hash, min_acc_gas, min_memo_gas)) {
-        log::warn("boot", "upgrade failed");
-        return 0;
-    }
-
+    service::upgrade(&code_hash, min_acc_gas, min_memo_gas);
     return pos;
 }
 

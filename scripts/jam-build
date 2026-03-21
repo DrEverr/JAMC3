@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # jam-build: Build a C3 JAM service into a .jam blob.
 #
-# Pipeline:
+# Pipeline (with jamtool):
 #   1. c3c compile-only  -> RISC-V .o files from C3 sources
 #   2. clang -c          -> host_stubs.o (PolkaVM metadata for host imports)
-#   3. ld.lld            -> linked ELF (with emit-relocs for polkatool)
-#   4. polkatool link    -> .polkavm binary (with dispatch table)
+#   3. jamtool           -> .jam blob (link + translate + serialize)
+#
+# Pipeline (legacy, without jamtool):
+#   1. c3c compile-only  -> RISC-V .o files
+#   2. clang -c          -> host_stubs.o
+#   3. ld.lld            -> linked ELF (with emit-relocs)
+#   4. polkatool link    -> .polkavm binary
 #   5. polkavm-to-jam    -> .jam blob
 #
 # Usage:
@@ -21,8 +26,7 @@
 # Requirements:
 #   - c3c            (C3 compiler with elf-riscv64 target)
 #   - clang          (for compiling host_stubs.c -> PolkaVM metadata)
-#   - polkatool      (PolkaVM linker/post-processor)
-#   - polkavm-to-jam (converter from .polkavm to .jam format)
+#   - jamtool        (preferred) OR polkatool + polkavm-to-jam + ld.lld
 
 set -euo pipefail
 

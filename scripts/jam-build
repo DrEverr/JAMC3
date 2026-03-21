@@ -103,12 +103,17 @@ TEMP_ELF="${TEMP_DIR}/${BASENAME}.elf"
 TEMP_POLKAVM="${TEMP_DIR}/${BASENAME}.polkavm"
 
 # ---- Check tool availability ----
-for tool in c3c polkatool polkavm-to-jam; do
-    if ! command -v "$tool" &>/dev/null; then
-        echo "Error: '$tool' not found in PATH." >&2
-        exit 1
-    fi
-done
+USE_JAMTOOL=false
+if command -v jamtool &>/dev/null; then
+    USE_JAMTOOL=true
+else
+    for tool in polkatool polkavm-to-jam; do
+        if ! command -v "$tool" &>/dev/null; then
+            echo "Error: '$tool' not found in PATH (and 'jamtool' is also unavailable)." >&2
+            exit 1
+        fi
+    done
+fi
 
 # Find a clang. Prefer clang-20, then clang-19, ..., then plain clang.
 CLANG=""
@@ -121,20 +126,6 @@ for v in 20 19 18 17 16 15 ""; do
 done
 if [[ -z "$CLANG" ]]; then
     echo "Error: No clang compiler found. Install clang (needed for PolkaVM host stubs)." >&2
-    exit 1
-fi
-
-# Find ld.lld (matching clang version or plain)
-LLD=""
-for v in 20 19 18 17 16 15 ""; do
-    candidate="ld.lld${v:+-$v}"
-    if command -v "$candidate" &>/dev/null; then
-        LLD="$candidate"
-        break
-    fi
-done
-if [[ -z "$LLD" ]]; then
-    echo "Error: No ld.lld linker found. Install lld." >&2
     exit 1
 fi
 
@@ -213,57 +204,83 @@ ${CLANG} \
 
 echo "  -> ${STUBS_OBJ}"
 
-# ---- Step 3: Link all objects -> ELF ----
-echo "[3/5] Linking -> RISC-V ELF..."
-
-# --unresolved-symbols=ignore-all: some entry points (e.g. jam_entry_is_authorized
-# for service builds) are referenced by export stubs but not defined.
-# polkatool only uses the dispatch table entries, so unused exports are harmless.
-${LLD} \
-    --emit-relocs \
-    --no-relax \
-    --entry=0 \
-    --error-limit=0 \
-    --unresolved-symbols=ignore-all \
-    -o "${TEMP_ELF}" \
-    "${C3_OBJS[@]}" \
-    "${STUBS_OBJ}"
-
-echo "  -> ${TEMP_ELF}"
-
-# ---- Step 4: polkatool link -> .polkavm ----
-echo "[4/5] polkatool link -> .polkavm..."
-
+# ---- Dispatch table string ----
 if [[ "$AUTHORIZER" == true ]]; then
     DISPATCH_TABLE="jam_entry_is_authorized"
 else
     DISPATCH_TABLE="jam_entry_refine,jam_entry_accumulate,jam_entry_accumulate,jam_entry_accumulate"
 fi
 
-polkatool link \
-    --dispatch-table "${DISPATCH_TABLE}" \
-    --min-stack-size ${MIN_STACK_SIZE} \
-    "${TEMP_ELF}" \
-    -o "${TEMP_POLKAVM}"
+if [[ "$USE_JAMTOOL" == true ]]; then
+    # ── jamtool path: steps 3+4+5 combined ───────────────────────────────────
+    echo "[3/3] jamtool: link + translate + serialize -> .jam..."
 
-echo "  -> ${TEMP_POLKAVM}"
+    jamtool \
+        --dispatch "${DISPATCH_TABLE}" \
+        --min-stack-size ${MIN_STACK_SIZE} \
+        -o "${OUTPUT}" \
+        "${C3_OBJS[@]}" "${STUBS_OBJ}"
 
-# ---- Step 5: polkavm-to-jam -> .jam ----
-echo "[5/5] polkavm-to-jam -> .jam..."
+    echo "  -> ${OUTPUT}"
 
-polkavm-to-jam "${TEMP_POLKAVM}" -o "${OUTPUT}"
+else
+    # ── Legacy path: ld.lld + polkatool + polkavm-to-jam ─────────────────────
+    # Find ld.lld (matching clang version or plain)
+    LLD=""
+    for v in 20 19 18 17 16 15 ""; do
+        candidate="ld.lld${v:+-$v}"
+        if command -v "$candidate" &>/dev/null; then
+            LLD="$candidate"
+            break
+        fi
+    done
+    if [[ -z "$LLD" ]]; then
+        echo "Error: No ld.lld linker found. Install lld." >&2
+        exit 1
+    fi
 
-echo "  -> ${OUTPUT}"
+    echo "[3/5] Linking -> RISC-V ELF..."
 
-# ---- Optionally copy intermediates ----
-if [[ "$KEEP_INTERMEDIATES" == true ]]; then
-    OUT_DIR="$(dirname "${OUTPUT}")"
-    cp "${TEMP_ELF}"     "${OUT_DIR}/${BASENAME}.elf"
-    cp "${TEMP_POLKAVM}" "${OUT_DIR}/${BASENAME}.polkavm"
-    echo ""
-    echo "Intermediates:"
-    echo "  ${OUT_DIR}/${BASENAME}.elf      (polkatool disassemble to inspect)"
-    echo "  ${OUT_DIR}/${BASENAME}.polkavm  (polkatool disassemble to inspect)"
+    # --unresolved-symbols=ignore-all: some entry points (e.g. jam_entry_is_authorized
+    # for service builds) are referenced by export stubs but not defined.
+    ${LLD} \
+        --emit-relocs \
+        --no-relax \
+        --entry=0 \
+        --error-limit=0 \
+        --unresolved-symbols=ignore-all \
+        -o "${TEMP_ELF}" \
+        "${C3_OBJS[@]}" \
+        "${STUBS_OBJ}"
+
+    echo "  -> ${TEMP_ELF}"
+
+    echo "[4/5] polkatool link -> .polkavm..."
+
+    polkatool link \
+        --dispatch-table "${DISPATCH_TABLE}" \
+        --min-stack-size ${MIN_STACK_SIZE} \
+        "${TEMP_ELF}" \
+        -o "${TEMP_POLKAVM}"
+
+    echo "  -> ${TEMP_POLKAVM}"
+
+    echo "[5/5] polkavm-to-jam -> .jam..."
+
+    polkavm-to-jam "${TEMP_POLKAVM}" -o "${OUTPUT}"
+
+    echo "  -> ${OUTPUT}"
+
+    # ---- Optionally copy intermediates ----
+    if [[ "$KEEP_INTERMEDIATES" == true ]]; then
+        OUT_DIR="$(dirname "${OUTPUT}")"
+        cp "${TEMP_ELF}"     "${OUT_DIR}/${BASENAME}.elf"
+        cp "${TEMP_POLKAVM}" "${OUT_DIR}/${BASENAME}.polkavm"
+        echo ""
+        echo "Intermediates:"
+        echo "  ${OUT_DIR}/${BASENAME}.elf      (polkatool disassemble to inspect)"
+        echo "  ${OUT_DIR}/${BASENAME}.polkavm  (polkatool disassemble to inspect)"
+    fi
 fi
 
 echo ""

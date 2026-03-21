@@ -3,26 +3,27 @@
 module hello;
 
 import jam::types;
-import jam::service;
+import jam::refine;
+import jam::accumulate;
 import jam::log;
 
 // ---------------------------------------------------------------------------
 // Refine - off-chain computation
 // ---------------------------------------------------------------------------
 
-fn types::RefineResult refine(types::RefineArgs* args) @export("refine")
+fn types::RefineResult refine(refine::Ctx* ctx) @export("refine")
 {
     log::info("hello", "Hello World from Refine!");
 
     char[5] result = { 'h', 'e', 'l', 'l', 'o' };
-    return service::refine_ok(&result, 5);
+    return ctx.result_ok(&result, 5);
 }
 
 // ---------------------------------------------------------------------------
 // Accumulate - on-chain computation
 // ---------------------------------------------------------------------------
 
-fn void accumulate(types::AccumulateArgs* args) @export("accumulate")
+fn void accumulate(accumulate::Ctx* ctx) @export("accumulate")
 {
     log::info("hello", "Hello World from Accumulate!");
 }

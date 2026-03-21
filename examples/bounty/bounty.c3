@@ -30,6 +30,8 @@ import jam::service;
 import jam::storage;
 import jam::codec;
 import jam::log;
+import jam::refine;
+import jam::accumulate;
 
 // ==========================================================================
 // Constants
@@ -79,45 +81,43 @@ struct Stats @packed
 // Returns a validated, re-encoded payload for accumulate to process.
 // ==========================================================================
 
-fn types::RefineResult refine(types::RefineArgs* args) @export("refine")
+fn types::RefineResult refine(refine::Ctx* ctx) @export("refine")
 {
     log::info("bounty", "Refine: processing work item");
 
-    if (args.work_payload == null || args.work_payload_len == 0)
+    if (ctx.payload() == null || ctx.payload_len() == 0)
     {
         log::err("bounty", "Refine: empty payload");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
 
-    codec::DecodeCtx ctx = codec::decode_ctx_init(
-        args.work_payload, args.work_payload_len
-    );
+    codec::DecodeCtx dec = codec::decode_ctx_init(ctx.payload(), ctx.payload_len());
 
     // Read command tag
-    char? maybe_cmd = codec::decode_u8(&ctx);
+    char? maybe_cmd = codec::decode_u8(&dec);
     if (catch maybe_cmd)
     {
         log::err("bounty", "Refine: failed to decode command tag");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     char cmd = maybe_cmd;
 
     if (cmd == CMD_POST_BOUNTY)
     {
-        return refine_post_bounty(&ctx, args);
+        return refine_post_bounty(&dec, ctx);
     }
     else if (cmd == CMD_CLAIM_BOUNTY)
     {
-        return refine_claim_bounty(&ctx, args);
+        return refine_claim_bounty(&dec, ctx);
     }
     else if (cmd == CMD_CANCEL_BOUNTY)
     {
-        return refine_cancel_bounty(&ctx, args);
+        return refine_cancel_bounty(&dec, ctx);
     }
     else
     {
       log::err("bounty", "Refine: unknown command");
-      return service::refine_empty();
+      return ctx.result_empty();
     }
 }
 
@@ -126,46 +126,46 @@ fn types::RefineResult refine(types::RefineArgs* args) @export("refine")
 // Validates reward amount and difficulty, passes through to accumulate.
 // ---------------------------------------------------------------------------
 
-fn types::RefineResult refine_post_bounty(codec::DecodeCtx* ctx, types::RefineArgs* args)
+fn types::RefineResult refine_post_bounty(codec::DecodeCtx* dec, refine::Ctx* ctx)
 {
     log::info("bounty", "Refine: POST_BOUNTY");
 
     // Decode reward amount
-    ulong? maybe_reward = codec::decode_u64(ctx);
+    ulong? maybe_reward = codec::decode_u64(dec);
     if (catch maybe_reward)
     {
         log::err("bounty", "Refine: failed to decode reward");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     ulong reward = maybe_reward;
 
     if (reward < MIN_REWARD)
     {
         log::warn("bounty", "Refine: reward below minimum");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
 
     // Decode difficulty
-    char? maybe_diff = codec::decode_u8(ctx);
+    char? maybe_diff = codec::decode_u8(dec);
     if (catch maybe_diff)
     {
         log::err("bounty", "Refine: failed to decode difficulty");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     char difficulty = maybe_diff;
 
     if ((ulong)difficulty > MAX_DIFFICULTY || difficulty == 0)
     {
         log::warn("bounty", "Refine: invalid difficulty");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
 
     // Decode 32-byte description
     char[32] desc;
-    if (catch codec::decode_fixed(ctx, &desc, 32))
+    if (catch codec::decode_fixed(dec, &desc, 32))
     {
         log::err("bounty", "Refine: failed to decode description");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
 
     // Re-encode validated payload for accumulate
@@ -173,12 +173,12 @@ fn types::RefineResult refine_post_bounty(codec::DecodeCtx* ctx, types::RefineAr
     char[42] out;
     out[0] = CMD_POST_BOUNTY;
 
-    if (catch codec::encode_u64(&out[1], 8, reward)) {return service::refine_empty();}
+    if (catch codec::encode_u64(&out[1], 8, reward)) {return ctx.result_empty();}
     out[9] = difficulty;
     codec::mem_copy(&out[10], &desc, 32);
 
     log::debug_u64("bounty", "Refine: validated bounty, reward", reward);
-    return service::refine_ok(&out, 42);
+    return ctx.result_ok(&out, 42);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,34 +187,34 @@ fn types::RefineResult refine_post_bounty(codec::DecodeCtx* ctx, types::RefineAr
 // leading zero bits. Uses a simple xorshift-based hash for PoW.
 // ---------------------------------------------------------------------------
 
-fn types::RefineResult refine_claim_bounty(codec::DecodeCtx* ctx, types::RefineArgs* args)
+fn types::RefineResult refine_claim_bounty(codec::DecodeCtx* dec, refine::Ctx* ctx)
 {
     log::info("bounty", "Refine: CLAIM_BOUNTY");
 
     // Decode bounty ID
-    ulong? maybe_id = codec::decode_u64(ctx);
+    ulong? maybe_id = codec::decode_u64(dec);
     if (catch maybe_id)
     {
         log::err("bounty", "Refine: failed to decode bounty_id");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     ulong bounty_id = maybe_id;
 
     // Decode nonce
-    ulong? maybe_nonce = codec::decode_u64(ctx);
+    ulong? maybe_nonce = codec::decode_u64(dec);
     if (catch maybe_nonce)
     {
         log::err("bounty", "Refine: failed to decode nonce");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     ulong nonce = maybe_nonce;
 
     // Decode claimer service ID
-    uint? maybe_claimer = codec::decode_u32(ctx);
+    uint? maybe_claimer = codec::decode_u32(dec);
     if (catch maybe_claimer)
     {
         log::err("bounty", "Refine: failed to decode claimer_id");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     uint claimer_id = maybe_claimer;
 
@@ -229,11 +229,11 @@ fn types::RefineResult refine_claim_bounty(codec::DecodeCtx* ctx, types::RefineA
     char[21] out;
     out[0] = CMD_CLAIM_BOUNTY;
 
-    if (catch codec::encode_u64(&out[1], 8, bounty_id)) {return service::refine_empty();}
-    if (catch codec::encode_u32(&out[9], 4, claimer_id)) {return service::refine_empty();}
-    if (catch codec::encode_u64(&out[13], 8, leading_zeros)) {return service::refine_empty();}
+    if (catch codec::encode_u64(&out[1], 8, bounty_id)) {return ctx.result_empty();}
+    if (catch codec::encode_u32(&out[9], 4, claimer_id)) {return ctx.result_empty();}
+    if (catch codec::encode_u64(&out[13], 8, leading_zeros)) {return ctx.result_empty();}
 
-    return service::refine_ok(&out, 21);
+    return ctx.result_ok(&out, 21);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,33 +241,33 @@ fn types::RefineResult refine_claim_bounty(codec::DecodeCtx* ctx, types::RefineA
 // Validates cancel request format, passes through.
 // ---------------------------------------------------------------------------
 
-fn types::RefineResult refine_cancel_bounty(codec::DecodeCtx* ctx, types::RefineArgs* args)
+fn types::RefineResult refine_cancel_bounty(codec::DecodeCtx* dec, refine::Ctx* ctx)
 {
     log::info("bounty", "Refine: CANCEL_BOUNTY");
 
-    ulong? maybe_id = codec::decode_u64(ctx);
+    ulong? maybe_id = codec::decode_u64(dec);
     if (catch maybe_id)
     {
         log::err("bounty", "Refine: failed to decode bounty_id");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     ulong bounty_id = maybe_id;
 
-    uint? maybe_poster = codec::decode_u32(ctx);
+    uint? maybe_poster = codec::decode_u32(dec);
     if (catch maybe_poster)
     {
         log::err("bounty", "Refine: failed to decode poster_id");
-        return service::refine_empty();
+        return ctx.result_empty();
     }
     uint poster_id = maybe_poster;
 
     // Pass through: [cmd:1][bounty_id:8][poster_id:4] = 13 bytes
     char[13] out;
     out[0] = CMD_CANCEL_BOUNTY;
-    if (catch codec::encode_u64(&out[1], 8, bounty_id)) {return service::refine_empty();}
-    if (catch codec::encode_u32(&out[9], 4, poster_id)) {return service::refine_empty();}
+    if (catch codec::encode_u64(&out[1], 8, bounty_id)) {return ctx.result_empty();}
+    if (catch codec::encode_u32(&out[9], 4, poster_id)) {return ctx.result_empty();}
 
-    return service::refine_ok(&out, 13);
+    return ctx.result_ok(&out, 13);
 }
 
 // ==========================================================================
@@ -277,31 +277,47 @@ fn types::RefineResult refine_cancel_bounty(codec::DecodeCtx* ctx, types::Refine
 // creates bounties, settles claims, or processes cancellations.
 // ==========================================================================
 
-fn void accumulate(types::AccumulateArgs* args) @export("accumulate")
+fn void accumulate(accumulate::Ctx* ctx) @export("accumulate")
 {
     log::info("bounty", "Accumulate: entry");
-    log::debug_u64("bounty", "Accumulate: timeslot", args.timeslot);
-    log::debug_u64("bounty", "Accumulate: inputs", args.num_inputs);
+    log::debug_u64("bounty", "Accumulate: timeslot", ctx.timeslot());
+    log::debug_u64("bounty", "Accumulate: inputs", ctx.num_inputs());
 
-    // Process each input from the work items
-    char[128] input_buf;
-    ulong? maybe_len = service::fetch_inputs(&input_buf, 128);
-    if (catch maybe_len)
+    // Iterate over inputs to find the first operand with valid output
+    accumulate::InputIter iter = ctx.inputs();
+
+    types::AccumulateInput? maybe_input = iter.next();
+    if (catch maybe_input)
     {
         log::warn("bounty", "Accumulate: no inputs available");
         return;
     }
-    usz input_len = maybe_len;
+    types::AccumulateInput input = maybe_input;
 
-    if (input_len == 0)
+    if (input.kind != types::AccumulateInputKind.OPERAND)
     {
-        log::warn("bounty", "Accumulate: empty input");
+        log::warn("bounty", "Accumulate: expected operand input");
         return;
     }
 
-    codec::DecodeCtx ctx = codec::decode_ctx_init(&input_buf, input_len);
+    if (input.operand.digest_output.status != types::WorkDigestStatus.OK)
+    {
+        log::warn("bounty", "Accumulate: operand not OK");
+        return;
+    }
 
-    char? maybe_cmd = codec::decode_u8(&ctx);
+    char* data     = input.operand.digest_output.data;
+    ulong data_len = input.operand.digest_output.data_len;
+
+    if (data == null || data_len == 0)
+    {
+        log::warn("bounty", "Accumulate: empty operand data");
+        return;
+    }
+
+    codec::DecodeCtx dec = codec::decode_ctx_init(data, data_len);
+
+    char? maybe_cmd = codec::decode_u8(&dec);
     if (catch maybe_cmd)
     {
         log::err("bounty", "Accumulate: failed to decode command");
@@ -311,15 +327,15 @@ fn void accumulate(types::AccumulateArgs* args) @export("accumulate")
 
     if (cmd == CMD_POST_BOUNTY)
     {
-        accumulate_post_bounty(&ctx, args);
+        accumulate_post_bounty(&dec, ctx);
     }
     else if (cmd == CMD_CLAIM_BOUNTY)
     {
-        accumulate_claim_bounty(&ctx, args);
+        accumulate_claim_bounty(&dec, ctx);
     }
     else if (cmd == CMD_CANCEL_BOUNTY)
     {
-        accumulate_cancel_bounty(&ctx, args);
+        accumulate_cancel_bounty(&dec, ctx);
     }
     else
     {
@@ -332,7 +348,7 @@ fn void accumulate(types::AccumulateArgs* args) @export("accumulate")
 // Creates a new bounty, assigns an ID, locks reward in storage.
 // ---------------------------------------------------------------------------
 
-fn void accumulate_post_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* args)
+fn void accumulate_post_bounty(codec::DecodeCtx* dec, accumulate::Ctx* ctx)
 {
     log::info("bounty", "Accumulate: creating bounty");
 
@@ -340,7 +356,7 @@ fn void accumulate_post_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* arg
     service::checkpoint();
 
     // Decode validated payload: [reward:8][difficulty:1][desc:32]
-    ulong? maybe_reward = codec::decode_u64(ctx);
+    ulong? maybe_reward = codec::decode_u64(dec);
     if (catch maybe_reward)
     {
         log::err("bounty", "Accumulate: failed to decode reward");
@@ -348,7 +364,7 @@ fn void accumulate_post_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* arg
     }
     ulong reward = maybe_reward;
 
-    char? maybe_diff = codec::decode_u8(ctx);
+    char? maybe_diff = codec::decode_u8(dec);
     if (catch maybe_diff)
     {
         log::err("bounty", "Accumulate: failed to decode difficulty");
@@ -357,7 +373,7 @@ fn void accumulate_post_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* arg
     char difficulty = maybe_diff;
 
     char[32] desc;
-    if (catch codec::decode_fixed(ctx, &desc, 32))
+    if (catch codec::decode_fixed(dec, &desc, 32))
     {
         log::err("bounty", "Accumulate: failed to decode description");
         return;
@@ -391,10 +407,10 @@ fn void accumulate_post_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* arg
     // Build the Bounty struct
     Bounty bounty;
     bounty.status      = BOUNTY_OPEN;
-    bounty.poster_id   = args.service_id;
+    bounty.poster_id   = ctx.service_id();
     bounty.reward      = reward;
     bounty.difficulty  = difficulty;
-    bounty.created_at  = args.timeslot;
+    bounty.created_at  = ctx.timeslot();
     bounty.winner_id   = 0;
     codec::mem_copy(&bounty.description, &desc, 32);
 
@@ -418,7 +434,7 @@ fn void accumulate_post_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* arg
 // Settles a bounty: verifies PoW meets difficulty, transfers reward.
 // ---------------------------------------------------------------------------
 
-fn void accumulate_claim_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* args)
+fn void accumulate_claim_bounty(codec::DecodeCtx* dec, accumulate::Ctx* ctx)
 {
     log::info("bounty", "Accumulate: processing claim");
 
@@ -426,7 +442,7 @@ fn void accumulate_claim_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* ar
     service::checkpoint();
 
     // Decode: [bounty_id:8][claimer_id:4][leading_zeros:8]
-    ulong? maybe_id = codec::decode_u64(ctx);
+    ulong? maybe_id = codec::decode_u64(dec);
     if (catch maybe_id)
     {
         log::err("bounty", "Accumulate: failed to decode bounty_id");
@@ -434,7 +450,7 @@ fn void accumulate_claim_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* ar
     }
     ulong bounty_id = maybe_id;
 
-    uint? maybe_claimer = codec::decode_u32(ctx);
+    uint? maybe_claimer = codec::decode_u32(dec);
     if (catch maybe_claimer)
     {
         log::err("bounty", "Accumulate: failed to decode claimer_id");
@@ -442,7 +458,7 @@ fn void accumulate_claim_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* ar
     }
     uint claimer_id = maybe_claimer;
 
-    ulong? maybe_zeros = codec::decode_u64(ctx);
+    ulong? maybe_zeros = codec::decode_u64(dec);
     if (catch maybe_zeros)
     {
         log::err("bounty", "Accumulate: failed to decode leading_zeros");
@@ -529,14 +545,14 @@ fn void accumulate_claim_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* ar
 // Only the original poster can cancel. Refunds locked reward.
 // ---------------------------------------------------------------------------
 
-fn void accumulate_cancel_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* args)
+fn void accumulate_cancel_bounty(codec::DecodeCtx* dec, accumulate::Ctx* ctx)
 {
     log::info("bounty", "Accumulate: processing cancellation");
 
     service::checkpoint();
 
     // Decode: [bounty_id:8][poster_id:4]
-    ulong? maybe_id = codec::decode_u64(ctx);
+    ulong? maybe_id = codec::decode_u64(dec);
     if (catch maybe_id)
     {
         log::err("bounty", "Accumulate: failed to decode bounty_id");
@@ -544,7 +560,7 @@ fn void accumulate_cancel_bounty(codec::DecodeCtx* ctx, types::AccumulateArgs* a
     }
     ulong bounty_id = maybe_id;
 
-    uint? maybe_poster = codec::decode_u32(ctx);
+    uint? maybe_poster = codec::decode_u32(dec);
     if (catch maybe_poster)
     {
         log::err("bounty", "Accumulate: failed to decode poster_id");
@@ -694,8 +710,8 @@ fn ulong read_next_id()
     ulong? maybe_bytes = storage::kv_read(&key, 4, &buf, 0, 8);
     if (try bytes_read = maybe_bytes)
     {
-        codec::DecodeCtx ctx = codec::decode_ctx_init(&buf, bytes_read);
-        ulong? maybe_id = codec::decode_u64(&ctx);
+        codec::DecodeCtx dec = codec::decode_ctx_init(&buf, bytes_read);
+        ulong? maybe_id = codec::decode_u64(&dec);
         if (try id = maybe_id)
         {
             return id;
@@ -792,8 +808,8 @@ fn ulong read_total_locked()
     ulong? maybe_bytes = storage::kv_read(&key, 4, &buf, 0, 8);
     if (try bytes_read = maybe_bytes)
     {
-        codec::DecodeCtx ctx = codec::decode_ctx_init(&buf, bytes_read);
-        ulong? maybe_val = codec::decode_u64(&ctx);
+        codec::DecodeCtx dec = codec::decode_ctx_init(&buf, bytes_read);
+        ulong? maybe_val = codec::decode_u64(&dec);
         if (try val = maybe_val)
         {
             return val;
@@ -831,8 +847,8 @@ fn ulong read_win_count(uint service_id)
     ulong? maybe_bytes = storage::kv_read(&key, 5, &buf, 0, 8);
     if (try bytes_read = maybe_bytes)
     {
-        codec::DecodeCtx ctx = codec::decode_ctx_init(&buf, bytes_read);
-        ulong? maybe_count = codec::decode_u64(&ctx);
+        codec::DecodeCtx dec = codec::decode_ctx_init(&buf, bytes_read);
+        ulong? maybe_count = codec::decode_u64(&dec);
         if (try count = maybe_count)
         {
             return count;

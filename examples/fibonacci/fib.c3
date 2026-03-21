@@ -3,19 +3,20 @@ module fib;
 
 import jam::codec;
 import jam::log;
-import jam::service;
 import jam::types;
+import jam::refine;
+import jam::accumulate;
 
-fn types::RefineResult refine(types::RefineArgs* args) @export("refine") {
-  log::debug_u64("fib", "Refine: entry, service: ", args.service_id);
+fn types::RefineResult refine(refine::Ctx* ctx) @export("refine") {
+  log::debug_u64("fib", "Refine: entry, service: ", ctx.service_id());
 
   ulong value = 10;
-  if (args.work_payload == null || args.work_payload_len == 0)
+  if (ctx.payload() == null || ctx.payload_len() == 0)
   {
     log::warn("fib", "Refine: empty payload. Calculating default value=10");
   } else {
-    codec::DecodeCtx ctx = codec::decode_ctx_init(args.work_payload, args.work_payload_len);
-    ulong? decoded = codec::decode_u8(&ctx);
+    codec::DecodeCtx dec = codec::decode_ctx_init(ctx.payload(), ctx.payload_len());
+    ulong? decoded = codec::decode_u8(&dec);
     if (catch decoded)
     {
       log::warn("fib", "Refine: failed to decode payload. Calculating default value=10");
@@ -24,17 +25,17 @@ fn types::RefineResult refine(types::RefineArgs* args) @export("refine") {
     }
   }
 
-  ulong result = fib(value);
+  ulong result = fib_calc(value);
   log::debug_u64("fib", "Refine: result ", result);
 
   char[8] buf;
-  if (catch codec::encode_u64(&buf, 8, result)) { return service::refine_empty(); }
-  return service::refine_ok(&buf, 8);
+  if (catch codec::encode_u64(&buf, 8, result)) { return ctx.result_empty(); }
+  return ctx.result_ok(&buf, 8);
 }
 
-fn void accumulate(types::AccumulateArgs* args) @export("accumulate") {}
+fn void accumulate(accumulate::Ctx* ctx) @export("accumulate") {}
 
-fn ulong fib(ulong n) {
+fn ulong fib_calc(ulong n) {
   ulong a;
   ulong b = 1;
 

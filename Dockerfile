@@ -22,14 +22,17 @@ ENV PATH="/opt/c3:${PATH}"
 ARG POLKATOOL_VERSION=0.29.0
 RUN cargo install --quiet --root /opt polkatool@${POLKATOOL_VERSION}
 
-# ---- polkavm-to-jam (patched: handles missing RO/RW sections from polkatool 0.29+) ----
+# ---- jamtool (RISC-V .o -> .jam recompiler) ----
+RUN cargo install --quiet --git https://github.com/DrEverr/jamtool --locked --root /opt
+
+# ---- polkavm-to-jam (legacy fallback for when jamtool is not used) ----
 COPY tools/polkavm-to-jam/ /tmp/polkavm-to-jam/
 RUN cargo install --quiet --path /tmp/polkavm-to-jam --root /opt
 
 ENV PATH="/opt/bin:${PATH}"
 
 # ---- Verify tools ----
-RUN c3c --version && polkatool --version && which polkavm-to-jam
+RUN c3c --version && polkatool --version && jamtool --help | head -1 && which polkavm-to-jam
 
 # ==========================================================================
 FROM --platform=linux/amd64 debian:13-slim AS runtime
@@ -44,6 +47,7 @@ COPY --from=builder /opt/c3 /opt/c3
 
 # Copy Rust-built tools
 COPY --from=builder /opt/bin/polkatool      /usr/local/bin/polkatool
+COPY --from=builder /opt/bin/jamtool        /usr/local/bin/jamtool
 COPY --from=builder /opt/bin/polkavm-to-jam /usr/local/bin/polkavm-to-jam
 
 ENV PATH="/opt/c3:${PATH}"

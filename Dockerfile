@@ -23,7 +23,7 @@ ARG POLKATOOL_VERSION=0.29.0
 RUN cargo install --quiet --root /opt polkatool@${POLKATOOL_VERSION}
 
 # ---- jamtool (RISC-V .o -> .jam recompiler) ----
-RUN cargo install --quiet --git https://github.com/DrEverr/jamtool --locked --root /opt
+RUN cargo install --quiet --git https://github.com/DrEverr/jamtool jamtool --locked --root /opt
 
 # ---- polkavm-to-jam (legacy fallback for when jamtool is not used) ----
 COPY tools/polkavm-to-jam/ /tmp/polkavm-to-jam/

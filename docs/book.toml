@@ -1,0 +1,10 @@
+[book]
+authors = ["jamc3 contributors"]
+language = "en"
+src = "src"
+title = "jamc3 - C3 SDK for JAM Protocol Services"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/DrEverr/jamc3"

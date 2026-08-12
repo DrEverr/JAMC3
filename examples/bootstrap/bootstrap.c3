@@ -49,7 +49,6 @@ module bootstrap;
 import jam::types;
 import jam::service;
 import jam::storage;
-import jam::host;
 import jam::log;
 import jam::codec;
 import jam::refine;
@@ -186,20 +185,31 @@ fn bool do_create_service(codec::DecodeCtx* ctx)
 
     log::info("boot", "Creating service");
 
-    // Create the new service account via raw host call
-    ulong ret = host::host_new(
-        (char*)&code_hash,
-        (ulong)code_len,
-        min_acc_gas,
-        min_memo_gas,
+    // Keep privileged options behind one pointer so the SDK wrapper remains
+    // within PolkaVM's a0-a5 limit.
+    service::NewServiceOptions options = {
         gratis_offset,
-        desired_id
-    );
-    if (ret >= types::HOST_NONE) {
+        (types::ServiceId)desired_id
+    };
+    types::ServiceId? maybe_new_id = (flags & 0x03) == 0
+        ? service::new_service(
+            &code_hash,
+            (ulong)code_len,
+            min_acc_gas,
+            min_memo_gas
+        )
+        : service::new_service_with_options(
+            &code_hash,
+            (ulong)code_len,
+            min_acc_gas,
+            min_memo_gas,
+            &options
+        );
+    if (catch maybe_new_id) {
         log::warn("boot", "new_service failed");
         return false;
     }
-    types::ServiceId new_id = (types::ServiceId)ret;
+    types::ServiceId new_id = maybe_new_id;
 
     log::info("boot", "Created svc");
 
